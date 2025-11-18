@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:11
+    container_name: wp-int-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wp-net
+
+  wordpress:
+    image: wordpress:6.7-php8.2-apache
+    container_name: wp-int-wordpress
+    depends_on:
+      - db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG}
+    ports:
+      - "${WORDPRESS_PORT:-8080}:80"
+    volumes:
+      # gesamtes wp-content
+      - ./wordpress/wp-content:/var/www/html/wp-content
+      # eigene Plugins / Themes / Uploads als separate Mounts (überschreiben die Unterordner)
+      - ./plugins:/var/www/html/wp-content/plugins
+      - ./plugins/themes:/var/www/html/wp-content/themes
+      - ./plugins/uploads:/var/www/html/wp-content/uploads
+    networks:
+      - wp-net
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: wp-int-phpmyadmin
+    depends_on:
+      - db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PMA_HOST: db
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      PMA_ABSOLUTE_URI: http://localhost:${PMA_PORT}/
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    networks:
+      - wp-net
+
+volumes:
+  db_data:
+
+networks:
+  wp-net:
+    driver: bridge
